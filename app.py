@@ -4,8 +4,21 @@ import os
 
 app = Flask(__name__)
 
+# OpenAI API key ortam değişkeninden alınır
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# Twilio ilk çağrıyı yaptığında çalışacak olan endpoint
+@app.route("/", methods=["GET", "POST"])
+def welcome():
+    return Response("""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather input="speech" timeout="5" action="/webhook" method="POST">
+    <Say voice="Polly.Joanna" language="en-US">Hi, how can I help you?</Say>
+  </Gather>
+  <Say voice="Polly.Joanna" language="en-US">Sorry, I didn't hear anything.</Say>
+</Response>""", mimetype="text/xml")
+
+# Kullanıcı konuştuğunda çağrılacak webhook
 @app.route("/webhook", methods=["POST"])
 def webhook():
     speech_result = request.form.get("SpeechResult", "")
