@@ -21,6 +21,7 @@ def welcome():
 # Kullanıcı konuştuğunda çağrılacak webhook
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    print("FULL FORM:", request.form)
     speech_result = request.form.get("SpeechResult", "")
     print("Caller said:", speech_result)
 
