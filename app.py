@@ -1,13 +1,16 @@
 from flask import Flask, request, Response
 import openai
 import os
+import logging
 
 app = Flask(__name__)
 
-# OpenAI API key ortam değişkeninden alınır
+# OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Twilio ilk çağrıyı yaptığında çalışacak olan endpoint
+# Logging yapılandırması
+logging.basicConfig(level=logging.INFO)
+
 @app.route("/", methods=["GET", "POST"])
 def welcome():
     return Response("""<?xml version="1.0" encoding="UTF-8"?>
@@ -18,15 +21,16 @@ def welcome():
   <Say voice="Polly.Joanna" language="en-US">Sorry, I didn't hear anything.</Say>
 </Response>""", mimetype="text/xml")
 
-# Kullanıcı konuştuğunda çağrılacak webhook
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    print("FULL FORM:", request.form)
+    logging.info("===== Incoming Webhook =====")
+    logging.info(f"Request form: {request.form.to_dict()}")
+
     speech_result = request.form.get("SpeechResult", "")
-    print("Caller said:", speech_result)
+    logging.info(f"Caller said: {speech_result}")
 
     if not speech_result:
-        return twiml_response("Sorry, I didn't catch that.")
+        return twiml_response("Sorry, I didn't catch that. Could you please repeat?")
 
     try:
         completion = openai.ChatCompletion.create(
@@ -38,7 +42,8 @@ def webhook():
         )
         response_text = completion.choices[0].message["content"]
     except Exception as e:
-        response_text = "I'm sorry, there was an error connecting to the assistant."
+        logging.error(f"OpenAI error: {e}")
+        response_text = "I'm sorry, there was a problem connecting to the assistant."
 
     return twiml_response(response_text)
 
