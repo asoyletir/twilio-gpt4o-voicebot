@@ -18,13 +18,8 @@ The initial greeting will already be provided by the system:
 
 Do not repeat this greeting. Continue the conversation based on the user’s response and language.
 
-Then detect the language preference:
-- If user replies in French or says “oui”, “je préfère le français”, etc. → Switch fully to French
-- If user continues in English → Proceed in English
-
 Strictly follow these rules:
-- GREET ONLY ONCE: Say "Welcome to Neatliner Customer Service..." only in your first response.
-- NEVER say "Welcome..." or any greeting again, even as part of a longer sentence.
+- GREET ONLY ONCE: Never say "Welcome..." again.
 - DO NOT start over unless explicitly asked by the user.
 - ALWAYS respond based on the full conversation history and the most recent user message.
 - Use clear, polite, and professional language.
@@ -36,8 +31,7 @@ ENGLISH FLOW:
 2. If it's a complaint: ask where they bought the product and the order number. Confirm the number if provided.
 
 3. Ask the user to explain their complaint in detail.
-
-If during the explanation the user brings up something clearly unrelated to Neatliner, apply step 1 and politely end the call.
+→ If during the explanation the user brings up something clearly unrelated to Neatliner, apply step 1 and politely end the call.
 
 4. If it is a suggestion or request → acknowledge and ask: 
 "I’ve noted your request. Is there anything else I can help you with?"
@@ -56,8 +50,7 @@ FRENCH FLOW:
 2. Si c’est une réclamation : demander où le produit a été acheté et le numéro de commande. Confirmer ce numéro s’il est fourni.
 
 3. Demander à l’utilisateur d’expliquer en détail le problème.
-
-Si l'utilisateur commence à parler d'un sujet sans rapport avec Neatliner, appliquez la règle 1 et terminez poliment l'appel.
+→ Si l'utilisateur commence à parler d'un sujet sans rapport avec Neatliner, appliquez la règle 1 et terminez poliment l'appel.
 
 4. S’il s’agit d’une suggestion ou d’une demande → accuser réception et demander :
 "J’ai noté votre demande. Y a-t-il autre chose avec laquelle je peux vous aider ?"
@@ -73,7 +66,12 @@ def welcome():
     return Response("""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather input="speech" timeout="5" action="/webhook" method="POST">
-    <Say voice="Polly.Joanna" language="en-US">Welcome to Neatliner Customer Service. I’m here to assist you with anything related to Neatliner products. Pour le service en français, vous pouvez parler en français maintenant.</Say>
+    <Say voice="Polly.Joanna" language="en-US">
+  Welcome to Neatliner Customer Service. I’m here to assist you with anything related to Neatliner products.
+</Say>
+<Say voice="Polly.Celine" language="fr-CA">
+  Pour le service en français, vous pouvez parler en français maintenant.
+</Say>
   </Gather>
   <Say voice="Polly.Joanna" language="en-US">Sorry, I didn't hear anything.</Say>
 </Response>""", mimetype="text/xml")
@@ -130,6 +128,10 @@ def webhook():
 
     return twiml_response(response_text)
 
+def is_french(text):
+    french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "Neatliner"]
+    return any(word.lower() in text.lower() for word in french_keywords)
+
 def twiml_response(text):
     final_closures = [
         "Thank you for contacting Neatliner Customer Service.",
@@ -147,21 +149,18 @@ def twiml_response(text):
         "Malheureusement, je ne peux pas vous aider"
     ]
 
-    if any(phrase in text for phrase in final_closures):
-        return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="Polly.Joanna" language="en-US">{text}</Say>
-</Response>""", mimetype="text/xml")
+    voice = "Polly.Celine" if is_french(text) else "Polly.Joanna"
+    lang = "fr-CA" if is_french(text) else "en-US"
 
-    if any(phrase in text for phrase in skip_gather_phrases):
+    if any(phrase in text for phrase in final_closures + skip_gather_phrases):
         return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna" language="en-US">{text}</Say>
+  <Say voice="{voice}" language="{lang}">{text}</Say>
 </Response>""", mimetype="text/xml")
 
     return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Joanna" language="en-US">{text}</Say>
+  <Say voice="{voice}" language="{lang}">{text}</Say>
   <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
 </Response>""", mimetype="text/xml")
 
