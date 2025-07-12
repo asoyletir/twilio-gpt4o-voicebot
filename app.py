@@ -4,14 +4,9 @@ import os
 import logging
 
 app = Flask(__name__)
-
-# OpenAI API Key
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# Logging configuration
 logging.basicConfig(level=logging.INFO)
 
-# System Prompt in English
 SYSTEM_PROMPT = """
 You are the AI voice assistant of Neatliner Customer Service. Follow this flow:
 
@@ -75,6 +70,7 @@ def webhook():
             ]
         )
         response_text = completion.choices[0].message["content"]
+        logging.info(f"GPT response: {response_text}")
     except Exception as e:
         logging.error(f"OpenAI error: {e}")
         response_text = "I'm sorry, there was a problem connecting to the assistant."
@@ -100,7 +96,6 @@ def twiml_response(text):
         <Say voice="Polly.Joanna" language="en-US">Is there anything else I can help you with?</Say>
     </Gather>
 </Response>""", mimetype="text/xml")
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
