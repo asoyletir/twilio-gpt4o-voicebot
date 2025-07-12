@@ -7,6 +7,9 @@ app = Flask(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 logging.basicConfig(level=logging.INFO)
 
+# Konuşma geçmişini tutmak için CallSid'e göre oturum hafızası
+session_memory = {}
+
 SYSTEM_PROMPT = """
 You are a professional English-speaking customer support voice assistant for Neatliner, a Canadian household product brand.
 
@@ -14,7 +17,7 @@ Strictly follow these rules:
 - GREET ONLY ONCE: Say "Welcome to Neatliner Customer Service..." only in your first response.
 - NEVER say "Welcome..." or any greeting again, even as part of a longer sentence.
 - DO NOT start over unless explicitly asked by the user.
-- ALWAYS respond based on the most recent user message and continue the flow.
+- ALWAYS respond based on the full conversation history and the most recent user message.
 
 Flow:
 1. Greet once: "Welcome to Neatliner Customer Service. How can I assist you today?"
@@ -47,29 +50,34 @@ def welcome():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    logging.info("===== Incoming Webhook =====")
-    logging.info(f"Request form: {request.form.to_dict()}")
-
+    call_sid = request.form.get("CallSid")
     speech_result = request.form.get("SpeechResult", "")
+    logging.info("===== Incoming Webhook =====")
+    logging.info(f"CallSid: {call_sid}")
     logging.info(f"Caller said: {speech_result}")
 
     if not speech_result:
         return twiml_response("Sorry, I didn't catch that. Could you please repeat?")
 
+    if call_sid not in session_memory:
+        session_memory[call_sid] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        logging.info("Initialized new session memory")
+
+    session_memory[call_sid].append({"role": "user", "content": speech_result})
+
     try:
         completion = client.chat.completions.create(
             model="gpt-4o",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": speech_result}
-            ]
+            messages=session_memory[call_sid]
         )
         response_text = completion.choices[0].message.content
         logging.info(f"GPT response: {response_text}")
 
+        session_memory[call_sid].append({"role": "assistant", "content": response_text})
+
         if "Welcome to Neatliner" in response_text:
             logging.warning("⚠️ GPT repeated the welcome message unexpectedly.")
-            # Split and remove welcome if followed by useful continuation
+            # Welcome tekrarını kırp (isteğe bağlı)
             parts = response_text.split("?")
             if len(parts) > 1:
                 response_text = "?".join(parts[1:]).strip()
