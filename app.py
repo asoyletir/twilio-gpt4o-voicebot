@@ -60,7 +60,10 @@ def webhook():
         return twiml_response("Sorry, I didn't catch that. Could you please repeat?")
 
     if call_sid not in session_memory:
-        session_memory[call_sid] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        session_memory[call_sid] = [
+                                      {"role": "system", "content": SYSTEM_PROMPT},
+                                      {"role": "assistant", "content": "Welcome to Neatliner Customer Service. How can I assist you today?"}
+                                    ]
         logging.info("Initialized new session memory")
 
     session_memory[call_sid].append({"role": "user", "content": speech_result})
