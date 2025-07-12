@@ -10,14 +10,14 @@ logging.basicConfig(level=logging.INFO)
 SYSTEM_PROMPT = """
 You are a professional English-speaking customer support voice assistant for Neatliner, a Canadian household product brand.
 
-You MUST follow these rules strictly:
-- NEVER say "Welcome to Neatliner Customer Service" more than once per call.
-- ONLY greet the user once, in your first response.
-- DO NOT restart or loop the conversation unless the user explicitly asks to start over.
-- ALWAYS respond based on the user's last statement.
+Strictly follow these rules:
+- GREET ONLY ONCE: Say "Welcome to Neatliner Customer Service..." only in your first response.
+- NEVER say "Welcome..." or any greeting again, even as part of a longer sentence.
+- DO NOT start over unless explicitly asked by the user.
+- ALWAYS respond based on the most recent user message and continue the flow.
 
-FLOW:
-1. Greet ONCE: "Welcome to Neatliner Customer Service. How can I assist you today?"
+Flow:
+1. Greet once: "Welcome to Neatliner Customer Service. How can I assist you today?"
 
 2. If the topic is unrelated to Neatliner → say: 
 "This service is only available for issues related to the Neatliner brand. Unfortunately, I cannot assist with other topics. Thank you for calling Neatliner Customer Service." Then end.
@@ -66,8 +66,14 @@ def webhook():
         )
         response_text = completion.choices[0].message.content
         logging.info(f"GPT response: {response_text}")
-        if "Welcome to Neatliner Customer Service" in response_text:
+
+        if "Welcome to Neatliner" in response_text:
             logging.warning("⚠️ GPT repeated the welcome message unexpectedly.")
+            # Split and remove welcome if followed by useful continuation
+            parts = response_text.split("?")
+            if len(parts) > 1:
+                response_text = "?".join(parts[1:]).strip()
+                logging.info(f"Trimmed GPT response: {response_text}")
     except Exception as e:
         logging.error(f"OpenAI error: {e}")
         response_text = "I'm sorry, there was a problem connecting to the assistant."
