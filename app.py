@@ -1,3 +1,4 @@
+
 from flask import Flask, request, Response
 from openai import OpenAI
 import os
@@ -61,8 +62,6 @@ FRENCH FLOW:
 "Merci d’avoir contacté le service client Neatliner. Nous vous recontacterons dans les plus brefs délais. Au revoir !"
 """
 
-
-
 @app.route("/", methods=["GET", "POST"])
 def welcome():
     return Response("""<?xml version="1.0" encoding="UTF-8"?>
@@ -74,7 +73,42 @@ def welcome():
   <Say voice="Polly.Joanna" language="en-US">Sorry, I didn't hear anything.</Say>
 </Response>""", mimetype="text/xml")
 
+def twiml_response(text):
+    final_closures = [
+        "Thank you for contacting Neatliner Customer Service.",
+        "Thank you for calling Neatliner Customer Service.",
+        "We’ll follow up with you as soon as possible. Goodbye!",
+        "Merci d’avoir contacté le service client Neatliner.",
+        "Nous vous recontacterons dans les plus brefs délais. Au revoir !"
+    ]
 
+    skip_gather_phrases = [
+        "Welcome to Neatliner Customer Service",
+        "Thank you for contacting Neatliner Customer Service",
+        "Unfortunately, I cannot assist with other topics",
+        "Merci d’avoir contacté le service client Neatliner",
+        "Malheureusement, je ne peux pas vous aider"
+    ]
+
+    def is_french(text):
+        french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "Neatliner"]
+        return any(word.lower() in text.lower() for word in french_keywords)
+
+    is_fr = is_french(text)
+    voice = "Polly.Celine" if is_fr else "Polly.Joanna"
+    lang = "fr-CA" if is_fr else "en-US"
+
+    if any(phrase in text for phrase in final_closures + skip_gather_phrases):
+        return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="{voice}" language="{lang}">{text}</Say>
+</Response>""", mimetype="text/xml")
+
+    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="{voice}" language="{lang}">{text}</Say>
+  <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
+</Response>""", mimetype="text/xml")
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -128,88 +162,5 @@ def webhook():
 
     return twiml_response(response_text)
 
-
-    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="{voice}" language="{lang}">{text}</Say>
-  <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
-</Response>""", mimetype="text/xml")
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
-
-
-def twiml_response(text):
-    final_closures = [
-        "Thank you for contacting Neatliner Customer Service.",
-        "Thank you for calling Neatliner Customer Service.",
-        "We’ll follow up with you as soon as possible. Goodbye!",
-        "Merci d’avoir contacté le service client Neatliner.",
-        "Nous vous recontacterons dans les plus brefs délais. Au revoir !"
-    ]
-
-    skip_gather_phrases = [
-        "Welcome to Neatliner Customer Service",
-        "Thank you for contacting Neatliner Customer Service",
-        "Unfortunately, I cannot assist with other topics",
-        "Merci d’avoir contacté le service client Neatliner",
-        "Malheureusement, je ne peux pas vous aider"
-    ]
-
-    def is_french(text):
-        french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "Neatliner"]
-        return any(word.lower() in text.lower() for word in french_keywords)
-
-    is_fr = is_french(text)
-    voice = "Polly.Celine" if is_fr else "Polly.Joanna"
-    lang = "fr-CA" if is_fr else "en-US"
-
-    if any(phrase in text for phrase in final_closures + skip_gather_phrases):
-        return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="{voice}" language="{lang}">{text}</Say>
-</Response>""", mimetype="text/xml")
-
-    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="{voice}" language="{lang}">{text}</Say>
-  <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
-</Response>""", mimetype="text/xml")
-
-
-def twiml_response(text):
-    final_closures = [
-        "Thank you for contacting Neatliner Customer Service.",
-        "Thank you for calling Neatliner Customer Service.",
-        "We’ll follow up with you as soon as possible. Goodbye!",
-        "Merci d’avoir contacté le service client Neatliner.",
-        "Nous vous recontacterons dans les plus brefs délais. Au revoir !"
-    ]
-
-    skip_gather_phrases = [
-        "Welcome to Neatliner Customer Service",
-        "Thank you for contacting Neatliner Customer Service",
-        "Unfortunately, I cannot assist with other topics",
-        "Merci d’avoir contacté le service client Neatliner",
-        "Malheureusement, je ne peux pas vous aider"
-    ]
-
-    def is_french(text):
-        french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "Neatliner"]
-        return any(word.lower() in text.lower() for word in french_keywords)
-
-    is_fr = is_french(text)
-    voice = "Polly.Celine" if is_fr else "Polly.Joanna"
-    lang = "fr-CA" if is_fr else "en-US"
-
-    if any(phrase in text for phrase in final_closures + skip_gather_phrases):
-        return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="{voice}" language="{lang}">{text}</Say>
-</Response>""", mimetype="text/xml")
-
-    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="{voice}" language="{lang}">{text}</Say>
-  <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
-</Response>""", mimetype="text/xml")
