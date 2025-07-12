@@ -82,14 +82,25 @@ def webhook():
     return twiml_response(response_text)
 
 def twiml_response(text):
+    final_closures = [
+        "Thank you for contacting Neatliner Customer Service.",
+        "I cannot assist with other topics. Thank you for calling Neatliner Customer Service."
+    ]
+
+    if any(phrase in text for phrase in final_closures):
+        return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="Polly.Joanna" language="en-US">{text}</Say>
+</Response>""", mimetype="text/xml")
+
     return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say voice="Polly.Joanna" language="en-US">{text}</Say>
     <Gather input="speech" timeout="5" action="/webhook" method="POST">
         <Say voice="Polly.Joanna" language="en-US">Is there anything else I can help you with?</Say>
     </Gather>
-    <Say voice="Polly.Joanna" language="en-US">Goodbye!</Say>
 </Response>""", mimetype="text/xml")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
