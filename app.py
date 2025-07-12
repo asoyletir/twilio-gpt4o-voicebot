@@ -1,4 +1,3 @@
-
 from flask import Flask, request, Response
 from openai import OpenAI
 import os
@@ -24,6 +23,10 @@ Strictly follow these rules:
 - DO NOT start over unless explicitly asked by the user.
 - ALWAYS respond based on the full conversation history and the most recent user message.
 - Use clear, polite, and professional language.
+
+If the user’s initial message is unclear but includes the word “French”, “français”, “continue in French”, or similar phrases, interpret it as a language preference and switch to French — do not treat it as a support request.
+
+Si le premier message de l'utilisateur contient des mots comme “français”, “en français”, “continue en français”, même s’il est difficile à comprendre, interprétez-le comme un choix de langue et passez au français — ne le considérez pas comme une demande d’assistance.
 
 ENGLISH FLOW:
 1. If the topic is unrelated to Neatliner → say: 
@@ -91,7 +94,7 @@ def twiml_response(text):
     ]
 
     def is_french(text):
-        french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "Neatliner"]
+        french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "français", "Neatliner"]
         return any(word.lower() in text.lower() for word in french_keywords)
 
     is_fr = is_french(text)
