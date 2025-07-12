@@ -8,33 +8,24 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 logging.basicConfig(level=logging.INFO)
 
 SYSTEM_PROMPT = """
-You are the AI voice assistant of Neatliner Customer Service. Follow this flow:
+You are a professional English-speaking customer support voice assistant for Neatliner, a Canadian household product brand.
 
-1. Greet the caller by saying:
-"Welcome to Neatliner Customer Service. How can I assist you today?"
+Always follow the flow below. DO NOT repeat the greeting unless explicitly asked. NEVER skip directly to the final step unless the user clearly says "nothing else" or "goodbye".
 
-2. Listen to what the customer says and determine if:
-  - It is a complaint → go to step 3.
-  - It is a suggestion or request → skip to step 5.
-  - It is unrelated to the Neatliner brand → respond with:
-    "This service is only available for issues related to the Neatliner brand. Unfortunately, I cannot assist with other topics. Thank you for calling Neatliner Customer Service."
-    Then end the conversation.
+FLOW:
+1. Greet once: "Welcome to Neatliner Customer Service. How can I assist you today?"
 
-3. If it's a complaint:
-  Ask: "Could you please tell me which marketplace you purchased the product from, and share your order number?"
-  If an order number is given, confirm: "Is this your order number: [number]?"
-  If the customer says it's incorrect and gives another one, confirm again.
+2. If the topic is unrelated to Neatliner → say: 
+"This service is only available for issues related to the Neatliner brand. Unfortunately, I cannot assist with other topics. Thank you for calling Neatliner Customer Service." Then end.
 
-4. Ask: "Please describe your complaint in detail."
+3. If it's a complaint: ask where they bought the product and the order number. Confirm the number if provided.
 
-5. Acknowledge what the customer said:
-   "I’ve noted your request. Is there anything else I can help you with?"
-   - If the user says "yes", return to step 2.
-   - If the user says "no", proceed to step 6.
+4. Ask the user to explain their complaint in detail.
 
-6. Ask: "In order to follow up on your request, may I have your email address?"
-   - Confirm: "I’ve recorded your email as: [email]. Is that correct?"
-   - If incorrect, ask again and confirm the new email.
+5. If it is a suggestion or request → acknowledge and ask: 
+"I’ve noted your request. Is there anything else I can help you with?"
+
+6. If user says "no", ask for email address and confirm it.
 
 7. End the call with:
 "Thank you for contacting Neatliner Customer Service. We’ll follow up with you as soon as possible. Goodbye!"
@@ -80,21 +71,32 @@ def webhook():
 def twiml_response(text):
     final_closures = [
         "Thank you for contacting Neatliner Customer Service.",
-        "I cannot assist with other topics. Thank you for calling Neatliner Customer Service."
+        "Thank you for calling Neatliner Customer Service.",
+        "We’ll follow up with you as soon as possible. Goodbye!"
+    ]
+
+    skip_gather_phrases = [
+        "Welcome to Neatliner Customer Service",
+        "Thank you for contacting Neatliner Customer Service",
+        "Unfortunately, I cannot assist with other topics"
     ]
 
     if any(phrase in text for phrase in final_closures):
         return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="Polly.Joanna" language="en-US">{text}</Say>
+  <Say voice="Polly.Joanna" language="en-US">{text}</Say>
+</Response>""", mimetype="text/xml")
+
+    if any(phrase in text for phrase in skip_gather_phrases):
+        return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna" language="en-US">{text}</Say>
 </Response>""", mimetype="text/xml")
 
     return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="Polly.Joanna" language="en-US">{text}</Say>
-    <Gather input="speech" timeout="5" action="/webhook" method="POST">
-        <Say voice="Polly.Joanna" language="en-US">Is there anything else I can help you with?</Say>
-    </Gather>
+  <Say voice="Polly.Joanna" language="en-US">{text}</Say>
+  <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
 </Response>""", mimetype="text/xml")
 
 if __name__ == "__main__":
