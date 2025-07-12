@@ -1,10 +1,10 @@
 from flask import Flask, request, Response
-import openai
+from openai import OpenAI
 import os
 import logging
 
 app = Flask(__name__)
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 logging.basicConfig(level=logging.INFO)
 
 SYSTEM_PROMPT = """
@@ -62,14 +62,14 @@ def webhook():
         return twiml_response("Sorry, I didn't catch that. Could you please repeat?")
 
     try:
-        completion = openai.ChatCompletion.create(
+        completion = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": speech_result}
             ]
         )
-        response_text = completion.choices[0].message["content"]
+        response_text = completion.choices[0].message.content
         logging.info(f"GPT response: {response_text}")
     except Exception as e:
         logging.error(f"OpenAI error: {e}")
