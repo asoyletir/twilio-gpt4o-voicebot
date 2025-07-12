@@ -61,20 +61,20 @@ FRENCH FLOW:
 "Merci d’avoir contacté le service client Neatliner. Nous vous recontacterons dans les plus brefs délais. Au revoir !"
 """
 
+
+
 @app.route("/", methods=["GET", "POST"])
 def welcome():
     return Response("""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather input="speech" timeout="5" action="/webhook" method="POST">
-    <Say voice="Polly.Joanna" language="en-US">
-  Welcome to Neatliner Customer Service. I’m here to assist you with anything related to Neatliner products.
-</Say>
-<Say voice="Polly.Celine" language="fr-CA">
-  Pour le service en français, vous pouvez parler en français maintenant.
-</Say>
+    <Say voice="Polly.Joanna" language="en-US">Welcome to Neatliner Customer Service. I’m here to assist you with anything related to Neatliner products.</Say>
+    <Say voice="Polly.Celine" language="fr-CA">Pour le service en français, vous pouvez parler en français maintenant.</Say>
   </Gather>
   <Say voice="Polly.Joanna" language="en-US">Sorry, I didn't hear anything.</Say>
 </Response>""", mimetype="text/xml")
+
+
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -128,9 +128,16 @@ def webhook():
 
     return twiml_response(response_text)
 
-def is_french(text):
-    french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "Neatliner"]
-    return any(word.lower() in text.lower() for word in french_keywords)
+
+    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="{voice}" language="{lang}">{text}</Say>
+  <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
+</Response>""", mimetype="text/xml")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
+
 
 def twiml_response(text):
     final_closures = [
@@ -149,8 +156,13 @@ def twiml_response(text):
         "Malheureusement, je ne peux pas vous aider"
     ]
 
-    voice = "Polly.Celine" if is_french(text) else "Polly.Joanna"
-    lang = "fr-CA" if is_french(text) else "en-US"
+    def is_french(text):
+        french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "Neatliner"]
+        return any(word.lower() in text.lower() for word in french_keywords)
+
+    is_fr = is_french(text)
+    voice = "Polly.Celine" if is_fr else "Polly.Joanna"
+    lang = "fr-CA" if is_fr else "en-US"
 
     if any(phrase in text for phrase in final_closures + skip_gather_phrases):
         return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -163,6 +175,3 @@ def twiml_response(text):
   <Say voice="{voice}" language="{lang}">{text}</Say>
   <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
 </Response>""", mimetype="text/xml")
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
