@@ -2,12 +2,12 @@ from flask import Flask, request, Response
 from openai import OpenAI
 import os
 import logging
+from gmail_mailer import send_email
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 logging.basicConfig(level=logging.INFO)
 
-# Konuşma geçmişini tutmak için CallSid'e göre oturum hafızası
 session_memory = {}
 
 SYSTEM_PROMPT = """
@@ -61,9 +61,9 @@ def webhook():
 
     if call_sid not in session_memory:
         session_memory[call_sid] = [
-                                      {"role": "system", "content": SYSTEM_PROMPT},
-                                      {"role": "assistant", "content": "Welcome to Neatliner Customer Service. How can I assist you today?"}
-                                    ]
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "assistant", "content": "Welcome to Neatliner Customer Service. How can I assist you today?"}
+        ]
         logging.info("Initialized new session memory")
 
     session_memory[call_sid].append({"role": "user", "content": speech_result})
@@ -80,11 +80,21 @@ def webhook():
 
         if "Welcome to Neatliner" in response_text:
             logging.warning("⚠️ GPT repeated the welcome message unexpectedly.")
-            # Welcome tekrarını kırp (isteğe bağlı)
             parts = response_text.split("?")
             if len(parts) > 1:
                 response_text = "?".join(parts[1:]).strip()
                 logging.info(f"Trimmed GPT response: {response_text}")
+
+        # Mail tetikleme: kapanış cümlesi içeriyorsa
+        if "Thank you for contacting Neatliner Customer Service" in response_text:
+            transcript = ""
+            for msg in session_memory[call_sid]:
+                if msg["role"] in ["user", "assistant"]:
+                    role = msg["role"].upper()
+                    content = msg["content"].strip()
+                    transcript += f"{role}: {content}\n"
+            send_email(transcript, call_sid)
+
     except Exception as e:
         logging.error(f"OpenAI error: {e}")
         response_text = "I'm sorry, there was a problem connecting to the assistant."
