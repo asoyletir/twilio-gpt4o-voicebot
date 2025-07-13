@@ -281,17 +281,17 @@ def twiml_response(text, lang="en"):
         voice = "Polly.Joanna"
         language = "en-US"
 
-        trigger_phrases = ["press the pound key", "press #", "type your order number", "enter your order number", 
-                   "appuyez sur la touche dièse", "touche dièse", "tapez votre numéro de commande"]
+    trigger_phrases = ["press the pound key", "press #", "type your order number", "enter your order number", 
+                "appuyez sur la touche dièse", "touche dièse", "tapez votre numéro de commande"]
 
-        if any(phrase in text.lower() for phrase in trigger_phrases):
-            return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-        <Response>
-          <Gather input="dtmf" timeout="15" finishOnKey="#" action="/order-number?lang={lang}" method="POST">
-            <Say voice="{voice}" language="{language}">{text}</Say>
-          </Gather>
-          <Redirect>/repeat-order-number?lang={lang}</Redirect>
-        </Response>""", mimetype="text/xml")
+    if any(phrase in text.lower() for phrase in trigger_phrases):
+        return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+    <Response>
+        <Gather input="dtmf" timeout="15" finishOnKey="#" action="/order-number?lang={lang}" method="POST">
+        <Say voice="{voice}" language="{language}">{text}</Say>
+        </Gather>
+        <Redirect>/repeat-order-number?lang={lang}</Redirect>
+    </Response>""", mimetype="text/xml")
 
     
     # Kapanış cümlesi veya sistem mesajı algılanırsa <Gather> ekleme, sadece oku
