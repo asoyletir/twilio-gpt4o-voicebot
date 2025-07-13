@@ -2,6 +2,7 @@ from flask import Flask, request, Response
 from openai import OpenAI
 import os
 import logging
+import re
 from gmail_mailer import send_email
 import tiktoken
 
@@ -121,6 +122,33 @@ def voice_flow():
   <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST" language="{language}"/>
 </Response>""", mimetype="text/xml")
 
+def extract_last_email(messages):
+    for msg in reversed(messages):
+        if msg["role"] == "user":
+            match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', msg["content"])
+            if match:
+                return match.group(0)
+    return "Not Provided"
+
+def extract_last_order_number(messages):
+    for msg in reversed(messages):
+        if msg["role"] == "user":
+            match = re.search(r'\b\d{3}[-\s]?\d{7}[-\s]?\d{7}\b', msg["content"])
+            if match:
+                return match.group(0).replace(" ", "")
+    return "Not Provided"
+
+def detect_call_type(messages):
+    full_text = " ".join(msg["content"].lower() for msg in messages if msg["role"] == "user")
+    if any(word in full_text for word in ["problem", "problème", "issue"]):
+        return "Complaint"
+    elif any(word in full_text for word in ["request", "demande", "exchange"]):
+        return "Request"
+    elif any(word in full_text for word in ["suggestion", "avis", "proposition"]):
+        return "Suggestion"
+    return "Not Identified"
+
+
 def twiml_response(text, lang="en"):
     text_clean = text.strip()
 
@@ -202,12 +230,22 @@ def webhook():
         session_memory[call_sid].append({"role": "assistant", "content": response_text})
 
         if "Thank you for contacting Neatliner Customer Service" in response_text or \
-           "Merci d’avoir contacté le service client Neatliner" in response_text:
-            transcript = ""
-            for msg in session_memory[call_sid]:
-                if msg["role"] in ["user", "assistant"]:
-                    transcript += f"{msg['role'].upper()}: {msg['content']}\n"
-            send_email(transcript, call_sid)
+       "Merci d’avoir contacté le service client Neatliner" in response_text:
+        transcript = ""
+        for msg in session_memory[call_sid]:
+        if msg["role"] in ["user", "assistant"]:
+            transcript += f"{msg['role'].upper()}: {msg['content'].strip()}\n"
+
+    metadata = {
+        "call_type": detect_call_type(session_memory[call_sid]),
+        "from_number": request.form.get("From"),
+        "location": f"{request.form.get('CallerCity', '')}, {request.form.get('CallerState', '')}".strip(", "),
+        "email": extract_last_email(session_memory[call_sid]),
+        "order_number": extract_last_order_number(session_memory[call_sid])
+    }
+
+    send_email(transcript, call_sid, metadata)
+
 
     except Exception as e:
         logging.error(f"OpenAI error: {e}")
