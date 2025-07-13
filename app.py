@@ -140,6 +140,8 @@ def handle_order_number():
     lang = request.args.get("lang", "en")
     call_sid = request.form.get("CallSid")
 
+    logging.info(f"Received DTMF digits: {request.form.get('Digits')}")
+    
     if not digits:
         message = "Sorry, I didn't receive your input. Please try again." if lang == "en" else "Désolé, je n'ai pas reçu votre saisie. Veuillez réessayer."
         return twiml_response(message, lang)
