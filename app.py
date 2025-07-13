@@ -281,7 +281,7 @@ def twiml_response(text, lang="en"):
         voice = "Polly.Joanna"
         language = "en-US"
 
-        if "press the pound key" in text_clean.lower() or "touche dièse" in text_clean.lower():
+        if "press the pound key" in text.lower() or "touche dièse" in text.lower():
             return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
         <Response>
           <Gather input="dtmf" timeout="10" finishOnKey="#" action="/order-number?lang={lang}" method="POST">
