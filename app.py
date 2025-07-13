@@ -3,7 +3,6 @@ from openai import OpenAI
 import os
 import logging
 from gmail_mailer import send_email
-import tiktoken
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
