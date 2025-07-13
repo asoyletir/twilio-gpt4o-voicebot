@@ -28,7 +28,8 @@ ENGLISH FLOW:
 1. If the topic is unrelated to Neatliner → say: 
 "This service is only available for issues related to the Neatliner brand. Unfortunately, I cannot assist with other topics. Thank you for calling Neatliner Customer Service." Then end.
 
-2. If it's a complaint: ask where they bought the product and the order number. Confirm the number if provided.
+2. If it's a complaint: ask where they bought the product and the order number. When asking for the order number, instruct the user to type it using their phone keypad followed by the pound key (#).
+For example: “Please enter your order number using the keypad, then press the pound key.” Then Confirm the order number if provided.
 
 3. Ask the user to explain their complaint in detail.
 → If during the explanation the user brings up something clearly unrelated to Neatliner, apply step 1 and politely end the call.
@@ -58,7 +59,7 @@ FRENCH FLOW :
 1. Si le sujet est sans rapport avec la marque Neatliner → dire :
 "Ce service est réservé aux demandes concernant la marque Neatliner. Malheureusement, je ne peux pas vous aider pour d'autres sujets. Merci d'avoir contacté le service client Neatliner." Puis terminer.
 
-2. Si c’est une réclamation : demander où le produit a été acheté et le numéro de commande. Confirmer ce numéro s’il est fourni.
+2. Si c’est une réclamation : demander où le produit a été acheté et le numéro de commande. Lors de la demande du numéro de commande, demandez à l'utilisateur de le saisir au clavier téléphonique suivi de la touche dièse (#). Confirmer ce numéro de commande s’il est fourni.
 
 3. Demander à l’utilisateur d’expliquer en détail le problème.
 → Si l'utilisateur parle d'un sujet sans rapport avec Neatliner, appliquez la règle 1 et terminez poliment.
@@ -122,6 +123,30 @@ def voice_flow():
   <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST" language="{language}"/>
 </Response>""", mimetype="text/xml")
 
+@app.route("/order-number", methods=["POST"])
+def handle_order_number():
+    digits = request.form.get("Digits", "")
+    lang = request.args.get("lang", "en")
+    call_sid = request.form.get("CallSid")
+
+    if not digits:
+        message = "Sorry, I didn't receive your input. Please try again." if lang == "en" else "Désolé, je n'ai pas reçu votre saisie. Veuillez réessayer."
+        return twiml_response(message, lang)
+
+    formatted = f"{digits[:3]}-{digits[3:10]}-{digits[10:]}" if len(digits) == 17 else digits
+
+    if call_sid in session_memory:
+        session_memory[call_sid].append({
+            "role": "user",
+            "content": f"My order number is {formatted}"
+        })
+
+    confirm = f"Thank you. I’ve received your order number: {formatted}. Could you now explain your issue in detail?" \
+              if lang == "en" else \
+              f"Merci. J'ai bien reçu votre numéro de commande : {formatted}. Pourriez-vous maintenant expliquer votre problème en détail ?"
+
+    return twiml_response(confirm, lang)
+
 def extract_last_email(messages):
     for msg in reversed(messages):
         if msg["role"] == "user":
@@ -167,6 +192,20 @@ def detect_call_type(messages):
         return "Suggestion"
     return "Not Identified"
 
+def extract_platform(messages):
+    full_text = " ".join(msg["content"].lower() for msg in messages if msg["role"] == "user")
+
+    if "amazon" in full_text:
+        return "Amazon"
+    elif "walmart" in full_text:
+        return "Walmart"
+    elif "website" in full_text or "neatliner.com" in full_text:
+        return "Neatliner Website"
+    elif "store" in full_text or "in store" in full_text:
+        return "Physical Store"
+    elif "online" in full_text:
+        return "Online (unspecified)"
+    return "Not Provided"
 
 def twiml_response(text, lang="en"):
     text_clean = text.strip()
@@ -197,6 +236,14 @@ def twiml_response(text, lang="en"):
         voice = "Polly.Joanna"
         language = "en-US"
 
+        if "press the pound key" in text.lower() or "touche dièse" in text.lower():
+            return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+    <Response>
+      <Gather input="dtmf" numDigits="20" finishOnKey="#" action="/order-number?lang={lang}" method="POST" language="{language}">
+        <Say voice="{voice}" language="{language}">{text}</Say>
+      </Gather>
+    </Response>""", mimetype="text/xml")
+    
     # Kapanış cümlesi veya sistem mesajı algılanırsa <Gather> ekleme, sadece oku
     if any(text_clean.startswith(phrase) for phrase in final_closures + skip_gather_phrases):
         logging.info("🛑 Final or passive phrase detected — returning without <Gather>")
@@ -261,6 +308,7 @@ def webhook():
                 "location": f"{request.form.get('CallerCity', '')}, {request.form.get('CallerState', '')}".strip(", "),
                 "email": extract_last_email(session_memory[call_sid]),
                 "order_number": extract_last_order_number(session_memory[call_sid])
+                "platform": extract_platform(session_memory[call_sid])
             }
 
             send_email(transcript, call_sid, metadata)
