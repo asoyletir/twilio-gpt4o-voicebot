@@ -92,9 +92,9 @@ def voice_flow():
     else:
         voice = "Polly.Joanna"
         language = "en-US"
-        welcome_line = "I’m here to assist you with anything related to Neatliner products."
+        welcome_line = "I’m here to assist you with any issues related to Neatliner products."
 
-    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+    return Response(f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <Response>
   <Say voice='{voice}' language='{language}'>{welcome_line}</Say>
   <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
