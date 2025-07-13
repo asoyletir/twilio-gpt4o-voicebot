@@ -5,6 +5,7 @@ import logging
 import re
 from gmail_mailer import send_email
 import tiktoken
+import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -133,6 +134,12 @@ def voice_flow():
   <Say voice="{voice}" language="{language}">{welcome_line}</Say>
   <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST" language="{language}"/>
 </Response>""", mimetype="text/xml")
+
+def estimate_twiml_size(text):
+    root = ET.Element("Response")
+    say = ET.SubElement(root, "Say")
+    say.text = text
+    return len(ET.tostring(root, encoding="utf-8"))
 
 @app.route("/order-number", methods=["POST"])
 def handle_order_number():
@@ -305,6 +312,7 @@ def webhook():
     logging.info("===== Incoming Webhook =====")
     logging.info(f"CallSid: {call_sid}")
     logging.info(f"Caller said: {speech_result}")
+    logging.info(f"TwiML size: {estimate_twiml_size(response_text)} bytes")
 
     if not speech_result:
         return twiml_response("Sorry, I didn't catch that. Could you please repeat?", lang)
@@ -324,11 +332,17 @@ def webhook():
     ])
 
     try:
+        trimmed = trim_session_memory(session_memory[call_sid], max_tokens=1500)
         completion = client.chat.completions.create(
             model="gpt-4o",
             messages=trimmed
         )
         response_text = completion.choices[0].message.content
+
+        if len(response_text) > 3000:
+            logging.warning("⚠️ GPT response too long, trimming for Twilio.")
+            response_text = response_text[:3000] + "..."
+        
         logging.info(f"GPT response: {response_text}")
 
         session_memory[call_sid].append({"role": "assistant", "content": response_text})
