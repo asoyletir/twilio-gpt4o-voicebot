@@ -312,7 +312,6 @@ def webhook():
     logging.info("===== Incoming Webhook =====")
     logging.info(f"CallSid: {call_sid}")
     logging.info(f"Caller said: {speech_result}")
-    logging.info(f"TwiML size: {estimate_twiml_size(response_text)} bytes")
 
     if not speech_result:
         return twiml_response("Sorry, I didn't catch that. Could you please repeat?", lang)
@@ -342,7 +341,8 @@ def webhook():
         if len(response_text) > 3000:
             logging.warning("⚠️ GPT response too long, trimming for Twilio.")
             response_text = response_text[:3000] + "..."
-        
+
+        logging.info(f"TwiML size: {estimate_twiml_size(response_text)} bytes")
         logging.info(f"GPT response: {response_text}")
 
         session_memory[call_sid].append({"role": "assistant", "content": response_text})
