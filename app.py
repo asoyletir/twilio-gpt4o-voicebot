@@ -118,7 +118,7 @@ def voice_flow():
     return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="{voice}" language="{language}">{welcome_line}</Say>
-  <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST"/>
+  <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST" language="{language}"/>
 </Response>""", mimetype="text/xml")
 
 def twiml_response(text, lang="en"):
