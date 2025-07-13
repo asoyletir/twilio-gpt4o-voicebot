@@ -307,7 +307,7 @@ def webhook():
                 "from_number": request.form.get("From"),
                 "location": f"{request.form.get('CallerCity', '')}, {request.form.get('CallerState', '')}".strip(", "),
                 "email": extract_last_email(session_memory[call_sid]),
-                "order_number": extract_last_order_number(session_memory[call_sid])
+                "order_number": extract_last_order_number(session_memory[call_sid]),
                 "platform": extract_platform(session_memory[call_sid])
             }
 
