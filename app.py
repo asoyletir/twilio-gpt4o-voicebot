@@ -144,6 +144,7 @@ def estimate_twiml_size(text):
 @app.route("/order-number", methods=["POST"])
 def handle_order_number():
     digits = request.form.get("Digits", "")
+    logging.info(f"Received DTMF digits: {digits}")
     lang = request.args.get("lang", "en")
     call_sid = request.form.get("CallSid")
 
@@ -282,12 +283,12 @@ def twiml_response(text, lang="en"):
 
         if "press the pound key" in text_clean.lower() or "touche dièse" in text_clean.lower():
             return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-    <Response>
-      <Gather input="dtmf" timeout="15" finishOnKey="#" action="/order-number?lang={lang}" method="POST" language="{language}">
-        <Say voice="{voice}" language="{language}">{text}</Say>
-      </Gather>
-      <Redirect>/repeat-order-number?lang={lang}</Redirect>
-    </Response>""", mimetype="text/xml")
+        <Response>
+          <Gather input="dtmf" timeout="10" finishOnKey="#" action="/order-number?lang={lang}" method="POST">
+            <Say voice="{voice}" language="{language}">{text}</Say>
+          </Gather>
+          <Redirect>/repeat-order-number?lang={lang}</Redirect>
+        </Response>""", mimetype="text/xml")
     
     # Kapanış cümlesi veya sistem mesajı algılanırsa <Gather> ekleme, sadece oku
     if any(text_clean.startswith(phrase) for phrase in final_closures + skip_gather_phrases):
