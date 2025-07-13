@@ -122,6 +122,8 @@ def voice_flow():
 </Response>""", mimetype="text/xml")
 
 def twiml_response(text, lang="en"):
+    text_clean = text.strip()
+
     if lang == "fr":
         final_closures = [
             "Merci d’avoir contacté le service client Neatliner.",
@@ -148,16 +150,19 @@ def twiml_response(text, lang="en"):
         voice = "Polly.Joanna"
         language = "en-US"
 
-    if any(phrase in text for phrase in final_closures + skip_gather_phrases):
+    # Kapanış cümlesi veya sistem mesajı algılanırsa <Gather> ekleme, sadece oku
+    if any(text_clean.startswith(phrase) for phrase in final_closures + skip_gather_phrases):
+        logging.info("🛑 Final or passive phrase detected — returning without <Gather>")
         return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="{voice}" language="{language}">{text}</Say>
+  <Say voice="{voice}" language="{language}">{text_clean}</Say>
 </Response>""", mimetype="text/xml")
 
+    # Normal akış — Gather ile cevap bekle
     return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="{voice}" language="{language}">{text}</Say>
-  <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST"/>
+  <Say voice="{voice}" language="{language}">{text_clean}</Say>
+  <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST" language="{language}"/>
 </Response>""", mimetype="text/xml")
 
 @app.route("/webhook", methods=["POST"])
