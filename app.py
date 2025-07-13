@@ -218,6 +218,30 @@ def extract_platform(messages):
         return "Online (unspecified)"
     return "Not Provided"
 
+@app.route("/repeat-order-number", methods=["GET", "POST"])
+def repeat_order_number():
+    lang = request.args.get("lang", "en")
+    if lang == "fr":
+        voice = "Polly.Celine"
+        language = "fr-CA"
+        repeat_msg = "Vous n'avez appuyé sur aucune touche. Veuillez entrer votre numéro de commande au clavier téléphonique, puis appuyez sur la touche dièse."
+        goodbye_msg = "Je suis désolé, je n’ai toujours pas reçu d’entrée. Je vais maintenant mettre fin à l’appel."
+    else:
+        voice = "Polly.Joanna"
+        language = "en-US"
+        repeat_msg = "You didn’t press any keys. Please enter your order number using the keypad and press the pound key."
+        goodbye_msg = "I'm sorry, I still didn’t receive any input. I will now end the call."
+
+    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+    <Response>
+      <Gather input="dtmf" timeout="10" finishOnKey="#" action="/order-number?lang={lang}" method="POST" language="{language}">
+        <Say voice="{voice}" language="{language}">{repeat_msg}</Say>
+      </Gather>
+      <Say voice="{voice}" language="{language}">{goodbye_msg}</Say>
+      <Hangup/>
+    </Response>""", mimetype="text/xml")
+
+
 def twiml_response(text, lang="en"):
     text_clean = text.strip()
 
@@ -253,6 +277,7 @@ def twiml_response(text, lang="en"):
       <Gather input="dtmf" timeout="15" finishOnKey="#" action="/order-number?lang={lang}" method="POST" language="{language}">
         <Say voice="{voice}" language="{language}">{text}</Say>
       </Gather>
+      <Redirect>/repeat-order-number?lang={lang}</Redirect>
     </Response>""", mimetype="text/xml")
     
     # Kapanış cümlesi veya sistem mesajı algılanırsa <Gather> ekleme, sadece oku
