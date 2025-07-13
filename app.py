@@ -230,21 +230,21 @@ def webhook():
         session_memory[call_sid].append({"role": "assistant", "content": response_text})
 
         if "Thank you for contacting Neatliner Customer Service" in response_text or \
-       "Merci d’avoir contacté le service client Neatliner" in response_text:
-        transcript = ""
-        for msg in session_memory[call_sid]:
-        if msg["role"] in ["user", "assistant"]:
-            transcript += f"{msg['role'].upper()}: {msg['content'].strip()}\n"
+           "Merci d’avoir contacté le service client Neatliner" in response_text:
+            transcript = ""
+            for msg in session_memory[call_sid]:
+            if msg["role"] in ["user", "assistant"]:
+                transcript += f"{msg['role'].upper()}: {msg['content'].strip()}\n"
 
-    metadata = {
-        "call_type": detect_call_type(session_memory[call_sid]),
-        "from_number": request.form.get("From"),
-        "location": f"{request.form.get('CallerCity', '')}, {request.form.get('CallerState', '')}".strip(", "),
-        "email": extract_last_email(session_memory[call_sid]),
-        "order_number": extract_last_order_number(session_memory[call_sid])
-    }
+            metadata = {
+                "call_type": detect_call_type(session_memory[call_sid]),
+                "from_number": request.form.get("From"),
+                "location": f"{request.form.get('CallerCity', '')}, {request.form.get('CallerState', '')}".strip(", "),
+                "email": extract_last_email(session_memory[call_sid]),
+                "order_number": extract_last_order_number(session_memory[call_sid])
+            }
 
-    send_email(transcript, call_sid, metadata)
+            send_email(transcript, call_sid, metadata)
 
 
     except Exception as e:
