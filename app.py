@@ -11,20 +11,17 @@ logging.basicConfig(level=logging.INFO)
 
 session_memory = {}
 
-SYSTEM_PROMPT = """
+# 🔹 İngilizce system prompt
+SYSTEM_PROMPT_EN = """
 You are a bilingual English and French-speaking customer support voice assistant for Neatliner, a household product brand sold in Canada and owned by a U.S.-based company, Brightstar Sales LLC.
 
-The initial greeting will already be provided by the system. Do not repeat it. Continue the conversation based on the user’s response and language.
+The initial greeting will already be provided by the system. Do not repeat it. Continue the conversation in English.
 
 Strictly follow these rules:
 - GREET ONLY ONCE: Never say "Welcome..." again.
 - DO NOT start over unless explicitly asked by the user.
 - ALWAYS respond based on the full conversation history and the most recent user message.
 - Use clear, polite, and professional language.
-
-If the user’s initial message is unclear but includes the word “French”, “français”, “continue in French”, or similar phrases, interpret it as a language preference and switch to French — do not treat it as a support request.
-
-Si le premier message de l'utilisateur contient des mots comme “français”, “en français”, “continue en français”, même s’il est difficile à comprendre, interprétez-le comme un choix de langue et passez au français — ne le considérez pas comme une demande d’assistance.
 
 ENGLISH FLOW:
 1. If the topic is unrelated to Neatliner → say: 
@@ -42,17 +39,28 @@ ENGLISH FLOW:
 
 6. End the call with:
 "Thank you for contacting Neatliner Customer Service. We’ll follow up with you as soon as possible. Goodbye!"
+"""
 
----
+# 🔹 Fransızca system prompt
+SYSTEM_PROMPT_FR = """
+Vous êtes un(e) assistant(e) bilingue du service client de Neatliner, une marque de produits ménagers vendue au Canada et appartenant à une entreprise américaine, Brightstar Sales LLC.
 
-FRENCH FLOW:
+Le message de bienvenue a déjà été fourni par le système. Ne le répétez pas. Continuez la conversation en français.
+
+Règles strictes :
+- SALUEZ UNE SEULE FOIS : Ne répétez jamais « Bienvenue... ».
+- NE REDÉMARREZ PAS la conversation sauf si l'utilisateur le demande.
+- RÉPONDEZ TOUJOURS en fonction de l’historique complet de la conversation et du dernier message.
+- Utilisez un langage clair, poli et professionnel.
+
+FRENCH FLOW :
 1. Si le sujet est sans rapport avec la marque Neatliner → dire :
 "Ce service est réservé aux demandes concernant la marque Neatliner. Malheureusement, je ne peux pas vous aider pour d'autres sujets. Merci d'avoir contacté le service client Neatliner." Puis terminer.
 
 2. Si c’est une réclamation : demander où le produit a été acheté et le numéro de commande. Confirmer ce numéro s’il est fourni.
 
 3. Demander à l’utilisateur d’expliquer en détail le problème.
-→ Si l'utilisateur commence à parler d'un sujet sans rapport avec Neatliner, appliquez la règle 1 et terminez poliment l'appel.
+→ Si l'utilisateur parle d'un sujet sans rapport avec Neatliner, appliquez la règle 1 et terminez poliment.
 
 4. S’il s’agit d’une suggestion ou d’une demande → accuser réception et demander :
 "J’ai noté votre demande. Y a-t-il autre chose avec laquelle je peux vous aider ?"
@@ -109,7 +117,7 @@ def voice_flow():
 
     return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice='{voice}' language='{language}'>{welcome_line}</Say>
+  <Say voice="{voice}" language="{language}">{welcome_line}</Say>
   <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST"/>
 </Response>""", mimetype="text/xml")
 
@@ -164,16 +172,19 @@ def webhook():
     if not speech_result:
         return twiml_response("Sorry, I didn't catch that. Could you please repeat?", lang)
 
+    # Doğru prompt'u başlat
     if call_sid not in session_memory:
+        system_prompt = SYSTEM_PROMPT_FR if lang == "fr" else SYSTEM_PROMPT_EN
         session_memory[call_sid] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "assistant", "content": "Welcome to Neatliner Customer Service. Pour le service en français, appuyez sur 9."}
+            {"role": "system", "content": system_prompt}
         ]
         logging.info("Initialized new session memory")
 
     session_memory[call_sid].append({"role": "user", "content": speech_result})
 
-    trimmed = trim_session_memory([msg for msg in session_memory[call_sid] if msg.get("role") in ["user", "assistant", "system"]])
+    trimmed = trim_session_memory([
+        msg for msg in session_memory[call_sid] if msg.get("role") in ["user", "assistant", "system"]
+    ])
 
     try:
         completion = client.chat.completions.create(
@@ -185,14 +196,12 @@ def webhook():
 
         session_memory[call_sid].append({"role": "assistant", "content": response_text})
 
-        if any(closing in response_text for closing in [
-            "Thank you for contacting Neatliner Customer Service.",
-            "Merci d’avoir contacté le service client Neatliner."
-        ]):
+        if "Thank you for contacting Neatliner Customer Service" in response_text or \
+           "Merci d’avoir contacté le service client Neatliner" in response_text:
             transcript = ""
             for msg in session_memory[call_sid]:
-                if msg.get("role") in ["user", "assistant"]:
-                    transcript += f"{msg['role'].upper()}: {msg['content'].strip()}\n"
+                if msg["role"] in ["user", "assistant"]:
+                    transcript += f"{msg['role'].upper()}: {msg['content']}\n"
             send_email(transcript, call_sid)
 
     except Exception as e:
