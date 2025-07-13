@@ -233,8 +233,8 @@ def webhook():
            "Merci d’avoir contacté le service client Neatliner" in response_text:
             transcript = ""
             for msg in session_memory[call_sid]:
-            if msg["role"] in ["user", "assistant"]:
-                transcript += f"{msg['role'].upper()}: {msg['content'].strip()}\n"
+                if msg["role"] in ["user", "assistant"]:
+                    transcript += f"{msg['role'].upper()}: {msg['content'].strip()}\n"
 
             metadata = {
                 "call_type": detect_call_type(session_memory[call_sid]),
