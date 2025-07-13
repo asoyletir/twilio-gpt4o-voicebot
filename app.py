@@ -239,7 +239,7 @@ def twiml_response(text, lang="en"):
         if "press the pound key" in text.lower() or "touche dièse" in text.lower():
             return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
     <Response>
-      <Gather input="dtmf" timeout="10" numDigits="20" finishOnKey="#" action="/order-number?lang={lang}" method="POST" language="{language}">
+      <Gather input="dtmf" timeout="15" finishOnKey="#" action="/order-number?lang={lang}" method="POST" language="{language}">
         <Say voice="{voice}" language="{language}">{text}</Say>
       </Gather>
     </Response>""", mimetype="text/xml")
