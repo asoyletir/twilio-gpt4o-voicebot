@@ -125,7 +125,17 @@ def voice_flow():
 def extract_last_email(messages):
     for msg in reversed(messages):
         if msg["role"] == "user":
-            match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', msg["content"])
+            text = msg["content"].lower()
+
+            # Yaygın konuşma dönüşümleri
+            text = text.replace(" arobase ", "@").replace(" at ", "@")
+            text = text.replace(" point ", ".").replace(" dot ", ".")
+
+            # Tek boşlukla düzelt
+            text = re.sub(r'\s+', '', text)
+
+            # E-posta kalıbını yakala
+            match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
             if match:
                 return match.group(0)
     return "Not Provided"
@@ -133,9 +143,18 @@ def extract_last_email(messages):
 def extract_last_order_number(messages):
     for msg in reversed(messages):
         if msg["role"] == "user":
-            match = re.search(r'\b\d{3}[-\s]?\d{7}[-\s]?\d{7}\b', msg["content"])
+            spoken = msg["content"].lower()
+
+            # Konuşma biçimlerini normalize et
+            spoken = spoken.replace(" dash ", "-").replace(" tiré ", "-").replace(" hyphen ", "-")
+
+            # Fazla boşlukları sil, çizgi formatına yaklaştır
+            spoken = re.sub(r'\s+', '', spoken)
+
+            # Order number formatını yakala: 702-1234567-9876543
+            match = re.search(r'(\d{3})[-]?(\d{7})[-]?(\d{7})', spoken)
             if match:
-                return match.group(0).replace(" ", "")
+                return f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
     return "Not Provided"
 
 def detect_call_type(messages):
