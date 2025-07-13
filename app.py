@@ -3,12 +3,14 @@ from openai import OpenAI
 import os
 import logging
 from gmail_mailer import send_email
+import tiktoken
 
 app = Flask(__name__)
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 logging.basicConfig(level=logging.INFO)
 
 session_memory = {}
+MAX_RESPONSE_CHARS = 1000
 
 SYSTEM_PROMPT = """
 You are a bilingual English and French-speaking customer support voice assistant for Neatliner, a household product brand sold in Canada and owned by a U.S.-based company, Brightstar Sales LLC.
@@ -62,6 +64,18 @@ FRENCH FLOW:
 "Merci d’avoir contacté le service client Neatliner. Nous vous recontacterons dans les plus brefs délais. Au revoir !"
 """
 
+def trim_session_memory(memory, max_tokens=1500):
+    encoding = tiktoken.encoding_for_model("gpt-4o")
+    total_tokens = 0
+    trimmed = []
+    for msg in reversed(memory):
+        tokens = len(encoding.encode(msg["content"]))
+        if total_tokens + tokens > max_tokens:
+            break
+        trimmed.insert(0, msg)
+        total_tokens += tokens
+    return trimmed
+
 @app.route("/", methods=["GET", "POST"])
 def welcome():
     return Response("""<?xml version="1.0" encoding="UTF-8"?>
@@ -94,100 +108,75 @@ def voice_flow():
         language = "en-US"
         welcome_line = "I’m here to assist you with any issues related to Neatliner products."
 
-    return Response(f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice='{voice}' language='{language}'>{welcome_line}</Say>
   <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
 </Response>""", mimetype="text/xml")
 
 def twiml_response(text):
-    final_closures = [
-        "Thank you for contacting Neatliner Customer Service.",
-        "Thank you for calling Neatliner Customer Service.",
-        "We’ll follow up with you as soon as possible. Goodbye!",
-        "Merci d’avoir contacté le service client Neatliner.",
-        "Nous vous recontacterons dans les plus brefs délais. Au revoir !"
-    ]
-
-    skip_gather_phrases = [
-        "Welcome to Neatliner Customer Service",
-        "Thank you for contacting Neatliner Customer Service",
-        "Unfortunately, I cannot assist with other topics",
-        "Merci d’avoir contacté le service client Neatliner",
-        "Malheureusement, je ne peux pas vous aider"
-    ]
-
-    def is_french(text):
-        french_keywords = ["bonjour", "merci", "adresse", "commande", "problème", "au revoir", "client", "produit", "français", "Neatliner"]
-        return any(word.lower() in text.lower() for word in french_keywords)
-
-    is_fr = is_french(text)
+    skip_phrases = ["Welcome to Neatliner", "Merci d’avoir contacté"]
+    final_phrases = ["Goodbye", "Au revoir"]
+    is_fr = any(word in text.lower() for word in ["merci", "produit", "client", "français"])
     voice = "Polly.Celine" if is_fr else "Polly.Joanna"
     lang = "fr-CA" if is_fr else "en-US"
 
-    if any(phrase in text for phrase in final_closures + skip_gather_phrases):
-        return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="{voice}" language="{lang}">{text}</Say>
-</Response>""", mimetype="text/xml")
+    trimmed = text[:MAX_RESPONSE_CHARS] + ("..." if len(text) > MAX_RESPONSE_CHARS else "")
+    if any(p in text for p in final_phrases + skip_phrases):
+        return Response(f"""<?xml version='1.0' encoding='UTF-8'?>
+<Response><Say voice="{voice}" language="{lang}">{trimmed}</Say></Response>""", mimetype="text/xml")
 
-    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+    return Response(f"""<?xml version='1.0' encoding='UTF-8'?>
 <Response>
-  <Say voice="{voice}" language="{lang}">{text}</Say>
+  <Say voice="{voice}" language="{lang}">{trimmed}</Say>
   <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
 </Response>""", mimetype="text/xml")
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     call_sid = request.form.get("CallSid")
-    speech_result = request.form.get("SpeechResult", "")
+    user_input = request.form.get("SpeechResult", "")
     logging.info("===== Incoming Webhook =====")
     logging.info(f"CallSid: {call_sid}")
-    logging.info(f"Caller said: {speech_result}")
+    logging.info(f"Caller said: {user_input}")
 
-    if not speech_result:
+    if not user_input:
         return twiml_response("Sorry, I didn't catch that. Could you please repeat?")
 
     if call_sid not in session_memory:
         session_memory[call_sid] = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "assistant", "content": "Welcome to Neatliner Customer Service. Pour le service en français, appuyez sur 9."}
+            {"role": "system", "content": SYSTEM_PROMPT}
         ]
         logging.info("Initialized new session memory")
 
-    session_memory[call_sid].append({"role": "user", "content": speech_result})
+    session_memory[call_sid].append({"role": "user", "content": user_input})
 
     try:
+        messages = trim_session_memory(session_memory[call_sid])
         completion = client.chat.completions.create(
             model="gpt-4o",
-            messages=session_memory[call_sid]
+            messages=messages
         )
-        response_text = completion.choices[0].message.content
-        logging.info(f"GPT response: {response_text}")
+        assistant_reply = completion.choices[0].message.content.strip()
+        logging.info(f"GPT response: {assistant_reply}")
 
-        session_memory[call_sid].append({"role": "assistant", "content": response_text})
+        if len(assistant_reply) > MAX_RESPONSE_CHARS:
+            assistant_reply = assistant_reply[:MAX_RESPONSE_CHARS] + "..."
 
-        if "Welcome to Neatliner" in response_text:
-            logging.warning("⚠️ GPT repeated the welcome message unexpectedly.")
-            parts = response_text.split("?")
-            if len(parts) > 1:
-                response_text = "?".join(parts[1:]).strip()
-                logging.info(f"Trimmed GPT response: {response_text}")
+        session_memory[call_sid].append({"role": "assistant", "content": assistant_reply})
 
-        if "Thank you for contacting Neatliner Customer Service" in response_text or "Merci d’avoir contacté le service client Neatliner" in response_text:
-            transcript = ""
-            for msg in session_memory[call_sid]:
-                if msg["role"] in ["user", "assistant"]:
-                    role = msg["role"].upper()
-                    content = msg["content"].strip()
-                    transcript += f"{role}: {content}\n"
+        if "Thank you for contacting Neatliner" in assistant_reply or "Merci d’avoir contacté" in assistant_reply:
+            transcript = "".join(
+                f"{msg['role'].upper()}: {msg['content']}\n"
+                for msg in session_memory[call_sid] if msg["role"] in ["user", "assistant"]
+            )
             send_email(transcript, call_sid)
+
+        return twiml_response(assistant_reply)
 
     except Exception as e:
         logging.error(f"OpenAI error: {e}")
-        response_text = "I'm sorry, there was a problem connecting to the assistant."
-
-    return twiml_response(response_text)
+        return twiml_response("I'm sorry, there was a problem connecting to the assistant.")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
