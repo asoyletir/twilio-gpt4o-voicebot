@@ -1,4 +1,4 @@
-from flask import Flask, request, Response
+from flask import Flask, request, Response, redirect, url_for
 from openai import OpenAI
 import os
 import logging
@@ -13,10 +13,7 @@ session_memory = {}
 SYSTEM_PROMPT = """
 You are a bilingual English and French-speaking customer support voice assistant for Neatliner, a household product brand sold in Canada and owned by a U.S.-based company, Brightstar Sales LLC.
 
-The initial greeting will already be provided by the system:
-"Welcome to Neatliner Customer Service. I’m here to assist you with anything related to Neatliner products. Pour le service en français, vous pouvez parler en français maintenant."
-
-Do not repeat this greeting. Continue the conversation based on the user’s response and language.
+The initial greeting will already be provided by the system. Do not repeat it. Continue the conversation based on the user’s response and language.
 
 Strictly follow these rules:
 - GREET ONLY ONCE: Never say "Welcome..." again.
@@ -69,11 +66,38 @@ FRENCH FLOW:
 def welcome():
     return Response("""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Gather input="speech" timeout="5" action="/webhook" method="POST">
-    <Say voice="Polly.Joanna" language="en-US">Welcome to Neatliner Customer Service. I’m here to assist you with anything related to Neatliner products.</Say>
-    <Say voice="Polly.Celine" language="fr-CA">Pour le service en français, vous pouvez parler en français maintenant.</Say>
+  <Gather action="/handle-selection" method="POST" input="dtmf" numDigits="1" timeout="5">
+    <Say voice="Polly.Joanna" language="en-US">Welcome to Neatliner Customer Service.</Say>
+    <Say voice="Polly.Celine" language="fr-CA">Bienvenue au service client Neatliner. Pour le service en français, appuyez sur 9.</Say>
   </Gather>
-  <Say voice="Polly.Joanna" language="en-US">Sorry, I didn't hear anything.</Say>
+  <Redirect>/voice?lang=en</Redirect>
+</Response>""", mimetype="text/xml")
+
+@app.route("/handle-selection", methods=["POST"])
+def handle_selection():
+    digits = request.form.get("Digits")
+    lang = "fr" if digits == "9" else "en"
+    return Response(f"""<?xml version='1.0' encoding='UTF-8'?>
+<Response>
+  <Redirect>/voice?lang={lang}</Redirect>
+</Response>""", mimetype="text/xml")
+
+@app.route("/voice", methods=["GET", "POST"])
+def voice_flow():
+    lang = request.args.get("lang", "en")
+    if lang == "fr":
+        voice = "Polly.Celine"
+        language = "fr-CA"
+        welcome_line = "Je suis ici pour vous aider concernant les produits Neatliner."
+    else:
+        voice = "Polly.Joanna"
+        language = "en-US"
+        welcome_line = "I’m here to assist you with anything related to Neatliner products."
+
+    return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice='{voice}' language='{language}'>{welcome_line}</Say>
+  <Gather input="speech" timeout="5" action="/webhook" method="POST"/>
 </Response>""", mimetype="text/xml")
 
 def twiml_response(text):
@@ -127,7 +151,7 @@ def webhook():
     if call_sid not in session_memory:
         session_memory[call_sid] = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "assistant", "content": "Welcome to Neatliner Customer Service. I’m here to assist you with anything related to Neatliner products. Pour le service en français, vous pouvez parler en français maintenant."}
+            {"role": "assistant", "content": "Welcome to Neatliner Customer Service. Pour le service en français, appuyez sur 9."}
         ]
         logging.info("Initialized new session memory")
 
