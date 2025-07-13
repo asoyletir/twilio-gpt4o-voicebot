@@ -17,6 +17,7 @@ def send_email(transcript, call_sid, metadata):
 🌍 Location: {metadata.get("location", "Unknown")}
 📧 Email Address: {metadata.get("email", "Not Provided")}
 🛒 Order Number: {metadata.get("order_number", "Not Provided")}
+📦 Platform: {metadata.get("platform", "Not Provided")}
 
 🎙 Conversation Transcript:
 {transcript}
