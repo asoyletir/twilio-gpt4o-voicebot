@@ -232,7 +232,7 @@ def format_email_for_confirmation(email: str, lang: str = "en") -> str:
     # Her harf arasına 1 saniyelik durak ekle
     slow_letters = ""
     for char in local_part:
-        slow_letters += f"{char.upper()}<break time=\"1s\"/> "
+        slow_letters += f"{char.upper()}<break time=\"3s\"/> "
 
     domain_slow = domain_part.replace(".", f" {dot_replacement} ")
 
