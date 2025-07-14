@@ -83,6 +83,15 @@ Une fois reçu, confirmez le numéro de commande.
 
 6. Terminer avec :
 "Merci d’avoir contacté le service client Neatliner. Nous vous recontacterons dans les plus brefs délais. Au revoir !"
+
+---
+
+EMAIL CONFIRMATION:
+- When confirming the user’s email address, spell out the part before the "@" sign slowly with short pauses between each letter (e.g., “A... B... C...”).
+- Then say the domain part normally (e.g., “at gmail dot com”).
+- For French: “arobase” for @ and “point” for . (e.g., “arobase gmail point com”).
+- Ask the user to confirm if the email is correct.
+
 """
 
 def trim_session_memory(memory, max_tokens=1500):
@@ -185,6 +194,30 @@ def extract_last_email(messages):
             if match:
                 return match.group(0)
     return "Not Provided"
+
+def format_email_for_confirmation(email: str, lang: str = "en") -> str:
+    import re
+
+    match = re.match(r"([\w\.-]+)@([\w\.-]+\.\w+)", email)
+    if not match:
+        return email  # Eğer format uygun değilse aynen döndür
+
+    local_part, domain_part = match.groups()
+
+    # Harfleri ayır: A... B... C...
+    if lang == "fr":
+        slow_part = "... ".join(char.upper() for char in local_part) + "..."
+        connector = "arobase"
+        dot_replacement = "point"
+    else:
+        slow_part = "... ".join(char.upper() for char in local_part) + "..."
+        connector = "at"
+        dot_replacement = "dot"
+
+    # Domain'i 'gmail dot com' şeklinde oku
+    domain_slow = domain_part.replace(".", f" {dot_replacement} ")
+
+    return f"{slow_part} {connector} {domain_slow}"
 
 def extract_last_order_number(messages):
     for msg in reversed(messages):
@@ -350,6 +383,14 @@ def webhook():
         logging.info(f"TwiML size: {estimate_twiml_size(response_text)} bytes")
         logging.info(f"GPT response: {response_text}")
 
+        if "email" in detect_call_type(session_memory[call_sid]):
+            email_plain = extract_last_email(session_memory[call_sid])
+            formatted_email = format_email_for_confirmation(email_plain, lang)
+            response_text = {
+                "en": f"To confirm, is your email address: {formatted_email}? If this is correct, please say yes.",
+                "fr": f"Pour confirmer, votre adresse e-mail est-elle : {formatted_email} ? Si c’est correct, dites oui."
+            }[lang]
+        
         session_memory[call_sid].append({"role": "assistant", "content": response_text})
 
         if "Thank you for contacting Neatliner Customer Service" in response_text or \
