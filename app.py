@@ -189,22 +189,28 @@ def handle_order_number():
 
     return twiml_response(confirm, lang)
 
-def extract_last_email(messages):
-    for msg in reversed(messages):
+def extract_last_email(memory):
+    import re
+
+    email_pattern = r"\b[\w\.-]+@[\w\.-]+\.\w+\b"
+
+    for msg in reversed(memory):
         if msg["role"] == "user":
-            text = msg["content"].lower()
+            content = msg["content"].lower()
 
-            # Yaygın konuşma dönüşümleri
-            text = text.replace(" arobase ", "@").replace(" at ", "@")
-            text = text.replace(" point ", ".").replace(" dot ", ".")
+            # Dönüşümler
+            content = content.replace(" at ", "@")
+            content = content.replace("arobase", "@")
+            content = content.replace(" dot ", ".").replace(" point ", ".")
+            content = re.sub(r"\s+", "", content)     # boşlukları kaldır
+            content = re.sub(r"\.(?=[^@]*@)", "", content)  # @ işaretinden önceki . karakterlerini kaldır
+            content = content.strip(" .")             # baştaki/sondaki nokta ve boşlukları kaldır
 
-            # Tek boşlukla düzelt
-            text = re.sub(r'\s+', '', text)
+            # E-mail yakala
+            matches = re.findall(email_pattern, content)
+            if matches:
+                return matches[-1].lower()  # her ihtimale karşı küçük harfe çevir
 
-            # E-posta kalıbını yakala
-            match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', text)
-            if match:
-                return match.group(0)
     return "Not Provided"
 
 def format_email_for_confirmation(email: str, lang: str = "en") -> str:
@@ -212,24 +218,26 @@ def format_email_for_confirmation(email: str, lang: str = "en") -> str:
 
     match = re.match(r"([\w\.-]+)@([\w\.-]+\.\w+)", email)
     if not match:
-        return email  # Eğer format uygun değilse aynen döndür
+        return email  # Format uygun değilse olduğu gibi döndür
 
     local_part, domain_part = match.groups()
 
-    # Harfleri ayır: A... B... C...
     if lang == "fr":
-        slow_part = "... ".join(char.upper() for char in local_part) + "..."
         connector = "arobase"
         dot_replacement = "point"
     else:
-        slow_part = "... ".join(char.upper() for char in local_part) + "..."
         connector = "at"
         dot_replacement = "dot"
 
-    # Domain'i 'gmail dot com' şeklinde oku
+    # Her harf arasına 1 saniyelik durak ekle
+    slow_letters = ""
+    for char in local_part:
+        slow_letters += f"{char.upper()}<break time=\"1s\"/> "
+
     domain_slow = domain_part.replace(".", f" {dot_replacement} ")
 
-    return f"{slow_part} {connector} {domain_slow}"
+    # Sonuç: A <break/> S <break/> ... at gmail dot com
+    return f"{slow_letters.strip()} {connector} {domain_slow}"
 
 def extract_last_order_number(messages):
     for msg in reversed(messages):
