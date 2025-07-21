@@ -412,11 +412,13 @@ def webhook():
             }[lang]
 
         if "Please enter your order number" in response_text:
-            # Ve order number daha önce alındıysa:
             order_number = extract_last_order_number(session_memory[call_sid])
-            if order_number:
+            if order_number and order_number != "Not Provided":
                 logging.warning("⚠️ GPT repeated order number request even though it was already provided.")
-                response_text = "Thank you. We've received your order number."
+                response_text = {
+                    "en": "Thank you. We've received your order number.",
+                    "fr": "Merci. Nous avons bien reçu votre numéro de commande."
+                }[lang]
         
         session_memory[call_sid].append({"role": "assistant", "content": response_text})
 
