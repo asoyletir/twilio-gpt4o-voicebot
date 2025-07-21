@@ -402,7 +402,7 @@ def webhook():
 
         logging.info(f"TwiML size: {estimate_twiml_size(response_text)} bytes")
         logging.info(f"GPT response: {response_text}")
-
+        
         if "email" in detect_call_type(session_memory[call_sid]):
             email_plain = extract_last_email(session_memory[call_sid])
             formatted_email = format_email_for_confirmation(email_plain, lang)
@@ -410,6 +410,12 @@ def webhook():
                 "en": f"To confirm, is your email address: {formatted_email}? If this is correct, please say yes.",
                 "fr": f"Pour confirmer, votre adresse e-mail est-elle : {formatted_email} ? Si c’est correct, dites oui."
             }[lang]
+
+        if "Please enter your order number" in response_text:
+            # Ve order number daha önce alındıysa:
+            if order_number:
+                logging.warning("⚠️ GPT repeated order number request even though it was already provided.")
+                response_text = "Thank you. We've received your order number."
         
         session_memory[call_sid].append({"role": "assistant", "content": response_text})
 
