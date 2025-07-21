@@ -45,7 +45,7 @@ Once the order number is received, confirm it with the user.
 
 5. If user says "no", ask for email address.
 When asking for the email address, ask the user to clearly say each letter of the part before the @ sign one by one, with short pauses between letters. For example:
-“A... S... O... Y... L... E... T... I... R...”
+“N... E... A... T...”
 Then ask the user to say the rest like "@gmail.com", "@yahoo.com", etc.
 Say:
 "I'm ready when you are."
@@ -87,7 +87,7 @@ Une fois reçu, confirmez le numéro de commande.
 
 5. Si l’utilisateur dit « non », demandez l’adresse e-mail.
 Lorsque vous demandez l’adresse e-mail, invitez l’utilisateur à dire chaque lettre de la partie avant l’arobase une par une, avec de courtes pauses entre les lettres. Par exemple :
-« A... S... O... Y... L... E... T... I... R... »
+« N... E... A... T... »
 Ensuite, demandez à l’utilisateur de prononcer le reste comme « @gmail.com », « @yahoo.fr », etc.
 Dites :
 « Je vous écoute. »
@@ -232,7 +232,7 @@ def format_email_for_confirmation(email: str, lang: str = "en") -> str:
     # Her harf arasına 1 saniyelik durak ekle
     slow_letters = ""
     for char in local_part:
-        slow_letters += f"{char.upper()}<break time=\"3s\"/> "
+        slow_letters += f"{char.upper()} . <break time=\"1s\"/> "
 
     domain_slow = domain_part.replace(".", f" {dot_replacement} ")
 
