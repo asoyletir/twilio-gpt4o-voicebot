@@ -413,6 +413,7 @@ def webhook():
 
         if "Please enter your order number" in response_text:
             # Ve order number daha önce alındıysa:
+            order_number = extract_last_order_number(session_memory[call_sid])
             if order_number:
                 logging.warning("⚠️ GPT repeated order number request even though it was already provided.")
                 response_text = "Thank you. We've received your order number."
