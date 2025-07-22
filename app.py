@@ -232,7 +232,7 @@ def format_email_for_confirmation(email: str, lang: str = "en") -> str:
     # Her harf arasına 1 saniyelik durak ekle
     slow_letters = ""
     for char in local_part:
-        slow_letters += f"{char.upper()} . <break time=\"1s\"/> "
+        slow_letters += f"{char.upper()} <break time=\"1s\"/> "
 
     domain_slow = domain_part.replace(".", f" {dot_replacement} ")
 
@@ -417,9 +417,13 @@ def webhook():
         if "email" in detect_call_type(session_memory[call_sid]):
             email_plain = extract_last_email(session_memory[call_sid])
             formatted_email = format_email_for_confirmation(email_plain, lang)
+
+            # SSML formatına sarmala
+            formatted_email_ssml = f"<speak>{formatted_email}</speak>"
+            
             response_text = {
-                "en": f"To confirm, is your email address: {formatted_email}? If this is correct, please say yes.",
-                "fr": f"Pour confirmer, votre adresse e-mail est-elle : {formatted_email} ? Si c’est correct, dites oui."
+                "en": f"To confirm, is your email address: {formatted_email_ssml}? If this is correct, please say yes.",
+                "fr": f"Pour confirmer, votre adresse e-mail est-elle : {formatted_email_ssml} ? Si c’est correct, dites oui."
             }[lang]
 
         if "Please enter your order number" in response_text:
