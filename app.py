@@ -337,30 +337,41 @@ def twiml_response(text, lang="en"):
     trigger_phrases = ["press the pound key", "press #", "type your order number", "enter your order number", 
                 "appuyez sur la touche dièse", "touche dièse", "tapez votre numéro de commande"]
 
+    # 🔹 SSML içeriği kontrolü
+    is_ssml = "<break" in text_clean or "<speak>" in text_clean
+
+    # 🔹 <Say> etiketi SSML'li veya düz olarak ayarlanır
+    say_tag = (
+        f'<Say voice="{voice}" language="{language}" ssml="true"><![CDATA[{text_clean}]]></Say>'
+        if is_ssml else
+        f'<Say voice="{voice}" language="{language}">{text_clean}</Say>'
+    )
+
+    # 🔹 Order number istendiğinde <Gather> ile bekleme + Redirect fallback
     if any(phrase in text.lower() for phrase in trigger_phrases):
         return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
-    <Response>
-        <Gather input="dtmf" timeout="15" finishOnKey="#" action="/order-number?lang={lang}" method="POST">
-        <Say voice="{voice}" language="{language}">{text}</Say>
-        </Gather>
-        <Redirect>/repeat-order-number?lang={lang}</Redirect>
-    </Response>""", mimetype="text/xml")
+<Response>
+    <Gather input="dtmf" timeout="15" finishOnKey="#" action="/order-number?lang={lang}" method="POST">
+        {say_tag}
+    </Gather>
+    <Redirect>/repeat-order-number?lang={lang}</Redirect>
+</Response>""", mimetype="text/xml")
 
-    
-    # Kapanış cümlesi veya sistem mesajı algılanırsa <Gather> ekleme, sadece oku
+    # 🔹 Final veya pasif mesajlar: <Gather> olmadan sadece konuşma
     if any(text_clean.startswith(phrase) for phrase in final_closures + skip_gather_phrases):
         logging.info("🛑 Final or passive phrase detected — returning without <Gather>")
         return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="{voice}" language="{language}">{text_clean}</Say>
+  {say_tag}
 </Response>""", mimetype="text/xml")
 
-    # Normal akış — Gather ile cevap bekle
+    # 🔹 Normal akış: konuşma + Gather
     return Response(f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="{voice}" language="{language}">{text_clean}</Say>
+  {say_tag}
   <Gather input="speech" timeout="5" action="/webhook?lang={lang}" method="POST" language="{language}"/>
 </Response>""", mimetype="text/xml")
+
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
